@@ -25,7 +25,7 @@ logging.basicConfig(filename='log.txt',
 store_path = 'processed_files'
 
 
-def transform_dir(dir_name, vocab_dict):
+def transform_dir(dir_name, vocab_dict, vocab_set):
     """Summary
     
     Args:
@@ -35,12 +35,12 @@ def transform_dir(dir_name, vocab_dict):
     import os
 
     for file_name in os.listdir(dir_name):
-        transform_file(file_name, dir_name, vocab_dict)
+        transform_file(file_name, dir_name, vocab_dict, vocab_set)
 
     logging.info(f'finish processing directory: {dir_name}')
 
 
-def transform_file(file_name, dir_name, vocab_dict):
+def transform_file(file_name, dir_name, vocab_dict, vocab_set):
     """replace each word in `vocab_dict` with its index
     then save file in ascii mode in `store_path`/`file_name`
     
@@ -60,6 +60,7 @@ def transform_file(file_name, dir_name, vocab_dict):
         for token in tokens:
             if token in vocab_dict:
                 numbers.append(vocab_dict[token])
+                vocab_set.add(token)
             else:
                 numbers.append(-1)
     file.close()
@@ -72,12 +73,22 @@ def transform_file(file_name, dir_name, vocab_dict):
 if __name__ == '__main__':
     w_2_vec = KeyedVectors.load_word2vec_format('FinalModel')
     vocab_dict = {}
-    pd_data = []
+    vocab_set = set()
     for word in w_2_vec.vocab:
-        pd_data.append([w_2_vec.vocab[word].index] + w_2_vec.wv[word].tolist())
+        # pd_data.append([w_2_vec.vocab[word].index] + w_2_vec.wv[word].tolist())
         vocab_dict[word] = w_2_vec.vocab[word].index
 
-    series = pd.Series(data=vocab_dict)
+    transform_dir('yjc_ir_political', vocab_dict, vocab_set)
+    transform_dir('yjc_ir_social', vocab_dict, vocab_set)
+    transform_dir('yjc_ir_sports', vocab_dict, vocab_set)
+
+    series = {}
+    pd_data= []
+    for word in vocab_set:
+        pd_data.append([vocab_dict[word]]+w_2_vec.wv[word].tolist())
+        series[word] = vocab_dict[word]
+
+    series = pd.Series(data=series)
     series.to_csv('dictionary.json', mode='w+', encoding='utf-8')
     logging.info(f'saving dictionary.json')
 
@@ -87,7 +98,3 @@ if __name__ == '__main__':
     pd_object.to_csv('features.csv', mode='w+', header=False,
                      encoding='ascii', sep=' ', index=False)
     logging.info(f'saving feature.json, shape: {pd_object.shape}')
-
-    transform_dir('yjc_ir_political', vocab_dict)
-    transform_dir('yjc_ir_social', vocab_dict)
-    transform_dir('yjc_ir_sports', vocab_dict)
